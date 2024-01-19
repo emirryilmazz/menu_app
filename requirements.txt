@@ -1,0 +1,7 @@
+Flask==3.0.0
+Flask-RESTful==0.3.10
+psycopg2==2.9.9
+Flask-JWT-Extended==4.6.0
+flask-login==0.6.3
+DateTime==5.4
+
