@@ -134,19 +134,6 @@ def jwt_control(jwt_token):
     except:
         return False
 
-class AdminRegister(Resource):
-    def post(self):
-        columns = ['name', 'surname', 'password', 'mobile_phone_number', 'gender']
-        col_strings, values = columns_values_creator(columns)
-        query = query_creator('insert', 'users', col_strings, values)
-        cur = get_db_connection()
-        cur.execute(query)
-        user = cur.fetchone()
-        id = user['id']
-        access_token = create_access_token(identity=id)
-        return {'Status': 201, 'access_token': access_token}
-
-
 class UserRegister(Resource):
     def post(self):
         columns = ['name', 'surname', 'password', 'mobile_phone_number', 'gender']
@@ -156,11 +143,46 @@ class UserRegister(Resource):
         cur.execute(query)
         user = cur.fetchone()
         id = user['id']
-        access_token = create_access_token(identity=id)
+        access_token = create_access_token(id, additional_claims={"is_user": True, "is_restaurant": False, "is_administrator": False})
         return {'Status': 201, 'access_token': access_token}
 
+class AdminRegister(Resource):
+    def post(self):
+        columns = ['name', 'surname', 'password', 'mobile_phone_number', 'gender']
+        col_strings, values = columns_values_creator(columns)
+        query = query_creator('insert', 'admins', col_strings, values)
+        cur = get_db_connection()
+        cur.execute(query)
+        user = cur.fetchone()
+        id = user['id']
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False, "is_administrator": True})
+        return {'Status': 201, 'access_token': access_token}
 
-class Login(Resource):
+class RestaurantRegister(Resource):
+    def post(self):
+        columns = ['name', 'legal_name', 'photo', 'description', 'address', 'menu_description']
+        col_strings, values = columns_values_creator(columns)
+        query = query_creator('insert', 'restaurants', col_strings, values)
+        cur = get_db_connection()
+        cur.execute(query)
+        restaurant = cur.fetchone()
+        id = restaurant['id']
+        query = "INSERT INTO restaurant_credentials (restaurant_id, password, mobile_phone_number) VALUES (%s, %s, %s)" % (id, request.form['password'], request.form['mobile_phone_number'])
+        return {'Status': 201}
+
+    def post(self):
+
+        columns = ['name', 'surname', 'password', 'mobile_phone_number', 'gender']
+        col_strings, values = columns_values_creator(columns)
+        query = query_creator('insert', 'admins', col_strings, values)
+        cur = get_db_connection()
+        cur.execute(query)
+        user = cur.fetchone()
+        id = user['id']
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False, "is_administrator": True})
+        return {'Status': 201, 'access_token': access_token}
+
+class UserLogin(Resource):
     def post(self):
         phone = request.form['mobile_phone_number']
         password = request.form['password']
@@ -173,6 +195,36 @@ class Login(Resource):
         if rows is None:
             return {'Status': 401, 'message': 'Invalid username or password'}
         access_token = create_access_token(id, additional_claims={"is_user": True, "is_restaurant": False, "is_administrator": False})
+        return {'Status': 200, 'access_token': access_token}
+
+class AdminLogin(Resource):
+    def post(self):
+        phone = request.form['mobile_phone_number']
+        password = request.form['password']
+        print(phone, password)
+        query = "SELECT * FROM admins WHERE mobile_phone_number = '%s' AND password = '%s'" % (phone, password)
+        cur = get_db_connection()
+        cur.execute(query)
+        rows = cur.fetchone()
+        id = rows['id']
+        if rows is None:
+            return {'Status': 401, 'message': 'Invalid phone or password'}
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False, "is_administrator": True})
+        return {'Status': 200, 'access_token': access_token}
+
+class RestaurantLogin(Resource):
+    def post(self):
+        phone = request.form['mobile_phone_number']
+        password = request.form['password']
+        print(phone, password)
+        query = "SELECT * FROM restaurant_credentials WHERE mobile_phone_number = '%s' AND password = '%s'" % (phone, password)
+        cur = get_db_connection()
+        cur.execute(query)
+        rows = cur.fetchone()
+        id = rows['restaurant_id']
+        if rows is None:
+            return {'Status': 401, 'message': 'Invalid phone or password'}
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": True, "is_administrator": False})
         return {'Status': 200, 'access_token': access_token}
 
 
@@ -673,8 +725,13 @@ def if_reservation_available(self, reservation_date, reservation_hour, restauran
 
 
 api.add_resource(Test, '/test')
+
+#api.add_resource(Admins, '/admins')
+api.add_resource(AdminLogin, '/admins/login')
+api.add_resource(AdminRegister, '/admins/register')
+
 api.add_resource(Users, '/users')
-api.add_resource(Login, '/users/login')
+api.add_resource(UserLogin, '/users/login')
 api.add_resource(UserRegister, '/users/register')
 api.add_resource(User, '/users/<user_id>')
 api.add_resource(UserReviews, '/users/<user_id>/reviews')
