@@ -8,7 +8,7 @@ services:
       context: .
       network: host
     ports:
-      - "5000:5000"
+      - "3000:5000"
     environment:
       IS_PROD: 1
       POSTGRES_HOST: "flask_db"
