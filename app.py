@@ -6,7 +6,8 @@ import os
 import psycopg2
 import psycopg2.extras
 from datetime import date, datetime
-from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager, verify_jwt_in_request, get_jwt
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager, verify_jwt_in_request, \
+    get_jwt
 
 app = Flask(__name__)
 api = Api(app)
@@ -20,14 +21,14 @@ conn = None
 def get_db_connection():
     global conn
     if conn is None:
-        # conn = psycopg2.connect("host=%s user=%s password=%s dbname=%s" % (os.environ['POSTGRES_HOST'],
-        #                       os.environ['POSTGRES_USERNAME'],
-        #                      os.environ['POSTGRES_PASSWORD'],
-        #                     os.environ['POSTGRES_DB']))
-        conn = psycopg2.connect("host=%s user=%s password=%s dbname=%s" % ('localhost',
-                                                                           'postgres',
-                                                                           'a',
-                                                                           'menu_app'))
+        conn = psycopg2.connect("host=%s user=%s password=%s dbname=%s" % (os.environ['POSTGRES_HOST'],
+                            os.environ['POSTGRES_USERNAME'],
+                            os.environ['POSTGRES_PASSWORD'],
+                            os.environ['POSTGRES_DB']))
+        #conn = psycopg2.connect("host=%s user=%s password=%s dbname=%s" % ('localhost',
+        #                                                                   'postgres',
+        #                                                                   'a',
+        #                                                                   'menu_app'))
         conn.autocommit = True
     cursor = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
     return cursor
@@ -72,6 +73,7 @@ def columns_values_creator(columns, extra_values=None, extra_columns=None):
     values = tuple(values)
     return columns, values
 
+
 def admin_required():
     def wrapper(fn):
         @wraps(fn)
@@ -88,6 +90,7 @@ def admin_required():
 
     return wrapper
 
+
 def user_required():
     def wrapper(fn):
         @wraps(fn)
@@ -102,6 +105,7 @@ def user_required():
         return decorator
 
     return wrapper
+
 
 def restaurant_required():
     def wrapper(fn):
@@ -119,7 +123,6 @@ def restaurant_required():
     return wrapper
 
 
-
 def jwt_control(jwt_token):
     try:
         jwt = jwt_token.split(' ')[1]
@@ -134,6 +137,7 @@ def jwt_control(jwt_token):
     except:
         return False
 
+
 class UserRegister(Resource):
     def post(self):
         columns = ['name', 'surname', 'password', 'mobile_phone_number', 'gender']
@@ -143,8 +147,10 @@ class UserRegister(Resource):
         cur.execute(query)
         user = cur.fetchone()
         id = user['id']
-        access_token = create_access_token(id, additional_claims={"is_user": True, "is_restaurant": False, "is_administrator": False})
+        access_token = create_access_token(id, additional_claims={"is_user": True, "is_restaurant": False,
+                                                                  "is_administrator": False})
         return {'Status': 201, 'access_token': access_token}
+
 
 class AdminRegister(Resource):
     def post(self):
@@ -155,8 +161,10 @@ class AdminRegister(Resource):
         cur.execute(query)
         user = cur.fetchone()
         id = user['id']
-        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False, "is_administrator": True})
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False,
+                                                                  "is_administrator": True})
         return {'Status': 201, 'access_token': access_token}
+
 
 class RestaurantRegister(Resource):
     def post(self):
@@ -169,10 +177,13 @@ class RestaurantRegister(Resource):
         id = restaurant['id']
         print(id)
         print(request.form['password'], request.form['mobile_phone_number'])
-        query = "INSERT INTO restaurant_credentials (restaurant_id, password, mobile_phone_number) VALUES (%s, '%s', '%s')" % (id, request.form['password'], request.form['mobile_phone_number'])
+        query = "INSERT INTO restaurant_credentials (restaurant_id, password, mobile_phone_number) VALUES (%s, '%s', '%s')" % (
+        id, request.form['password'], request.form['mobile_phone_number'])
         cur.execute(query)
-        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": True, "is_administrator": False})
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": True,
+                                                                  "is_administrator": False})
         return {'Status': 201, 'access_token': access_token}
+
 
 class UserLogin(Resource):
     def post(self):
@@ -186,8 +197,10 @@ class UserLogin(Resource):
         if rows is None:
             return {'Status': 401, 'message': 'Invalid username or password'}
         id = rows['id']
-        access_token = create_access_token(id, additional_claims={"is_user": True, "is_restaurant": False, "is_administrator": False})
+        access_token = create_access_token(id, additional_claims={"is_user": True, "is_restaurant": False,
+                                                                  "is_administrator": False})
         return {'Status': 200, 'access_token': access_token}
+
 
 class AdminLogin(Resource):
     def post(self):
@@ -201,22 +214,26 @@ class AdminLogin(Resource):
         if rows is None:
             return {'Status': 401, 'message': 'Invalid phone or password'}
         id = rows['id']
-        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False, "is_administrator": True})
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False,
+                                                                  "is_administrator": True})
         return {'Status': 200, 'access_token': access_token}
+
 
 class RestaurantLogin(Resource):
     def post(self):
         phone = request.form['mobile_phone_number']
         password = request.form['password']
         print(phone, password)
-        query = "SELECT * FROM restaurant_credentials WHERE mobile_phone_number = '%s' AND password = '%s'" % (phone, password)
+        query = "SELECT * FROM restaurant_credentials WHERE mobile_phone_number = '%s' AND password = '%s'" % (
+        phone, password)
         cur = get_db_connection()
         cur.execute(query)
         rows = cur.fetchone()
         if rows is None:
             return {'Status': 401, 'message': 'Invalid phone or password'}
         id = rows['restaurant_id']
-        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": True, "is_administrator": False})
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": True,
+                                                                  "is_administrator": False})
         return {'Status': 200, 'access_token': access_token}
 
 
@@ -240,6 +257,7 @@ class Users(Resource):
         cur = get_db_connection()
         cur.execute(query)
         return {'Status': 200}
+
 
 class User(Resource):
     def get(self, user_id):
@@ -447,26 +465,28 @@ class Restaurant(Resource):
         cur.execute(query)
         return {'Status': 200}
 
+
 class RestaurantsMenu(Resource):
     @restaurant_required()
     def get(self):
         id = get_jwt_identity()
-        query = query_creator('select', 'restaurants')
+        query = query_creator('select_where', 'menu_elements', id=id, where='restaurant_id')
         cur = get_db_connection()
         cur.execute(query)
         rows = cur.fetchall()
-        for row in rows:
-            row['menu_description'] = row['menu_description'].split(',')
         return jsonify(rows)
-    def post(self): # add menu element
+
+    @restaurant_required()
+    def post(self):  # add menu element
         id = get_jwt_identity()
-        columns = ['name', 'description', 'price', 'photo']
+        columns = ['name', 'description', 'price', 'photo', 'category']
         col_strings, values = columns_values_creator(columns, extra_values=[id],
                                                      extra_columns=['restaurant_id'])
         query = query_creator('insert', 'menu_elements', col_strings, values)
         cur = get_db_connection()
         cur.execute(query)
         return {'Status': 201}
+
 
 class RestaurantMenuElement(Resource):
     @restaurant_required()
@@ -492,6 +512,27 @@ class RestaurantMenuElement(Resource):
         cur = get_db_connection()
         cur.execute(query)
         return {'Status': 200}
+
+
+class RestaurantsReviews(Resource):
+    @restaurant_required()
+    def get(self):
+        id = get_jwt_identity()
+        query = "SELECT * FROM reservations RIGHT JOIN reviews ON reviews.reservation_id = reservations.id WHERE reservations.restaurant_id = %s" % id
+        cur = get_db_connection()
+        cur.execute(query)
+        rows = cur.fetchall()
+        for row in rows:
+            row['reservation_date'] = row['reservation_date'].strftime("%Y-%m-%d")
+            row['reservation_hour'] = row['reservation_hour'].strftime("%H:%M")
+        avg_rating_query = "SELECT avg(reviews.rating) from reviews LEFT JOIN reservations as r ON r.id = reviews.reservation_id WHERE r.restaurant_id = %s " % id
+        cur.execute(avg_rating_query)
+        avg = cur.fetchone()['avg']
+        if avg is None:
+            avg = 0
+        avg_rating = "{:.2f}".format(avg)
+        return jsonify({'AverageRating': avg_rating, 'Rows': rows})
+
 class RestaurantReviews(Resource):
     def get(self, restaurant_id):
         # fetch restaurant and its reviews by join method
@@ -510,8 +551,19 @@ class RestaurantReviews(Resource):
         avg_rating = "{:.2f}".format(avg)
         return jsonify({'AverageRating': avg_rating, 'Rows': rows})
 
+class RestaurantsReservations(Resource):
+    @restaurant_required()
+    def get(self):
+        id = get_jwt_identity()
+        query = query_creator('select_where', 'reservations', id=id, where='restaurant_id')
+        cur = get_db_connection()
+        cur.execute(query)
+        rows = cur.fetchall()
+        return jsonify(rows)
+
 
 class RestaurantReservations(Resource):
+    @admin_required()
     def get(self, restaurant_id):
         query = query_creator('select_where', 'reservations', id=restaurant_id)
         cur = get_db_connection()
@@ -529,6 +581,7 @@ class Waiters(Resource):
         rows = cur.fetchall()
         return jsonify(rows)
 
+    @admin_required()
     def post(self):
         columns = ['name', 'surname', 'restaurant_id']
         col_strings, values = columns_values_creator(columns)
@@ -583,6 +636,7 @@ class WaiterReviews(Resource):
 
 
 class WaiterReservations(Resource):
+    @admin_required()
     def get(self, waiter_id):
         query = query_creator('select_where', 'reservations', id=waiter_id, where='waiter_id')
         cur = get_db_connection()
@@ -608,12 +662,11 @@ class MenuElements(Resource):
         rows = cur.fetchone()
         return jsonify(rows)
 
+    @admin_required()
     def post(self, restaurant_id):
         columns = ['name', 'description', 'price', 'photo']
-        print('ss')
         col_strings, values = columns_values_creator(columns, extra_values=[restaurant_id],
                                                      extra_columns=['restaurant_id'])
-        print('ss')
         query = query_creator('insert', 'menu_elements', col_strings, values)
         print(query)
         cur = get_db_connection()
@@ -811,13 +864,18 @@ api.add_resource(MyReservation, '/my-reservations/<reservation_id>')  # user res
 api.add_resource(Restaurants, '/restaurants')
 api.add_resource(Restaurant, '/restaurants/<restaurant_id>')
 api.add_resource(RestaurantsMenu, '/restaurants/menu')
+api.add_resource(RestaurantMenuElement, '/restaurants/menu/<menu_element_id>')
 api.add_resource(Menu,
                  '/restaurants/<restaurant_id>/menu')  # See the restaurant menu or Create menu if there is no menu
 api.add_resource(MenuElements, '/restaurants/<restaurant_id>/menu/menu-element')  # Update or Delete or Add menu element
 api.add_resource(MenuElement,
                  '/restaurants/<restaurant_id>/menu/menu-element/<menu_element_id>')  # Update or Delete or Add menu element
+
 api.add_resource(RestaurantReviews, '/restaurants/<restaurant_id>/reviews')  # See the restaurant reviews
 api.add_resource(RestaurantReservations, '/restaurants/<restaurant_id>/reservations')  # See the restaurant reservations
+
+api.add_resource(RestaurantsReviews, '/restaurants/reviews')  # See the restaurant's reviews
+api.add_resource(RestaurantsReservations, '/restaurants/reservations')  # See the restaurant's reservations
 
 api.add_resource(Reviews, '/reviews')
 api.add_resource(Review, '/reviews/<review_id>')
