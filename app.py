@@ -167,19 +167,11 @@ class RestaurantRegister(Resource):
         cur.execute(query)
         restaurant = cur.fetchone()
         id = restaurant['id']
-        query = "INSERT INTO restaurant_credentials (restaurant_id, password, mobile_phone_number) VALUES (%s, %s, %s)" % (id, request.form['password'], request.form['mobile_phone_number'])
-        return {'Status': 201}
-
-    def post(self):
-
-        columns = ['name', 'surname', 'password', 'mobile_phone_number', 'gender']
-        col_strings, values = columns_values_creator(columns)
-        query = query_creator('insert', 'admins', col_strings, values)
-        cur = get_db_connection()
+        print(id)
+        print(request.form['password'], request.form['mobile_phone_number'])
+        query = "INSERT INTO restaurant_credentials (restaurant_id, password, mobile_phone_number) VALUES (%s, '%s', '%s')" % (id, request.form['password'], request.form['mobile_phone_number'])
         cur.execute(query)
-        user = cur.fetchone()
-        id = user['id']
-        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False, "is_administrator": True})
+        access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": True, "is_administrator": False})
         return {'Status': 201, 'access_token': access_token}
 
 class UserLogin(Resource):
@@ -191,9 +183,9 @@ class UserLogin(Resource):
         cur = get_db_connection()
         cur.execute(query)
         rows = cur.fetchone()
-        id = rows['id']
         if rows is None:
             return {'Status': 401, 'message': 'Invalid username or password'}
+        id = rows['id']
         access_token = create_access_token(id, additional_claims={"is_user": True, "is_restaurant": False, "is_administrator": False})
         return {'Status': 200, 'access_token': access_token}
 
@@ -206,9 +198,9 @@ class AdminLogin(Resource):
         cur = get_db_connection()
         cur.execute(query)
         rows = cur.fetchone()
-        id = rows['id']
         if rows is None:
             return {'Status': 401, 'message': 'Invalid phone or password'}
+        id = rows['id']
         access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": False, "is_administrator": True})
         return {'Status': 200, 'access_token': access_token}
 
@@ -221,9 +213,9 @@ class RestaurantLogin(Resource):
         cur = get_db_connection()
         cur.execute(query)
         rows = cur.fetchone()
-        id = rows['restaurant_id']
         if rows is None:
             return {'Status': 401, 'message': 'Invalid phone or password'}
+        id = rows['restaurant_id']
         access_token = create_access_token(id, additional_claims={"is_user": False, "is_restaurant": True, "is_administrator": False})
         return {'Status': 200, 'access_token': access_token}
 
@@ -240,7 +232,7 @@ class Users(Resource):
         rows = cur.fetchall()
         return jsonify(rows)
 
-    @jwt_required()
+    @admin_required()
     def post(self):
         columns = ['name', 'surname', 'password', 'mobile_phone_number', 'gender']
         col_strings, values = columns_values_creator(columns)
@@ -248,7 +240,6 @@ class Users(Resource):
         cur = get_db_connection()
         cur.execute(query)
         return {'Status': 200}
-
 
 class User(Resource):
     def get(self, user_id):
@@ -258,6 +249,7 @@ class User(Resource):
         rows = cur.fetchone()
         return jsonify(rows)
 
+    @admin_required()
     def put(self, user_id):
         columns = ['name', 'surname', 'password', 'mobile_phone_number', 'gender']
         col_strings, values = columns_values_creator(columns)
@@ -266,6 +258,7 @@ class User(Resource):
         cur.execute(query)
         return {'Status': 200}
 
+    @admin_required()
     def delete(self, user_id):
         query = query_creator('delete', 'users', id=user_id)
         cur = get_db_connection()
@@ -274,7 +267,7 @@ class User(Resource):
 
 
 class MyReviews(Resource):
-    @jwt_required()
+    @user_required()
     def get(self):
         current_user = get_jwt_identity()
         userReviews = UserReviews()
@@ -282,6 +275,7 @@ class MyReviews(Resource):
 
 
 class UserReviews(Resource):
+    @admin_required()
     def get(self, user_id):
         query = "SELECT * FROM reservations RIGHT JOIN reviews ON reviews.reservation_id = reservations.id WHERE reservations.user_id = %s" % user_id
         cur = get_db_connection()
@@ -294,14 +288,14 @@ class UserReviews(Resource):
 
 
 class MyReservations(Resource):
-    @jwt_required()
+    @user_required()
     def get(self):
         current_user = get_jwt_identity()
         print('crr', current_user)
         userReservations = UserReservations()
         return userReservations.get(current_user)
 
-    @jwt_required()
+    @user_required()
     def post(self):
         current_user = get_jwt_identity()
         columns = ['waiter_id', 'restaurant_id', 'status', 'reservation_date', 'reservation_hour', 'persons',
@@ -321,6 +315,7 @@ class MyReservations(Resource):
 
 
 class MyReservation(Resource):
+    @user_required()
     def get(self, reservation_id):
         query = query_creator('select_where', 'reservations', id=reservation_id)
         cur = get_db_connection()
@@ -330,6 +325,7 @@ class MyReservation(Resource):
         rows['reservation_hour'] = rows['reservation_hour'].strftime("%H:%M")
         return jsonify(rows)
 
+    @user_required()
     def put(self, reservation_id):
         current_user = get_jwt_identity()
         columns = ['waiter_id', 'restaurant_id', 'status', 'reservation_date', 'reservation_hour', 'persons',
@@ -347,6 +343,7 @@ class MyReservation(Resource):
         else:
             return {'Status': 400, 'message': 'Reservation is not available'}
 
+    @user_required()
     def delete(self, reservation_id):
         query = query_creator('delete', 'reservations', id=reservation_id)
         cur = get_db_connection()
@@ -355,6 +352,7 @@ class MyReservation(Resource):
 
 
 class UserReservations(Resource):
+    @admin_required()
     def get(self, user_id):
         query = query_creator('select_where', 'reservations', id=user_id, where='user_id')
         cur = get_db_connection()
@@ -365,6 +363,7 @@ class UserReservations(Resource):
             row['reservation_hour'] = row['reservation_hour'].strftime("%H:%M")
         return jsonify(rows)
 
+    @admin_required()
     def post(self, user_id):
         columns = ['waiter_id', 'restaurant_id', 'status', 'reservation_date', 'reservation_hour', 'persons',
                    'reservation_status']
@@ -383,6 +382,7 @@ class UserReservations(Resource):
 
 
 class UserReservation(Resource):
+    @admin_required()
     def get(self, user_id, reservation_id):
         query = query_creator('select_where', 'reservations', id=reservation_id)
         cur = get_db_connection()
@@ -390,6 +390,7 @@ class UserReservation(Resource):
         rows = cur.fetchone()
         return jsonify(rows)
 
+    @admin_required()
     def delete(self, user_id, reservation_id):
         query = query_creator('delete', 'reservations', id=reservation_id)
         cur = get_db_connection()
@@ -398,6 +399,7 @@ class UserReservation(Resource):
 
 
 class Restaurants(Resource):
+    # public
     def get(self):
         query = query_creator('select', 'restaurants')
         cur = get_db_connection()
@@ -405,6 +407,7 @@ class Restaurants(Resource):
         rows = cur.fetchall()
         return jsonify(rows)
 
+    @admin_required()
     def post(self):
         columns = ['name', 'legal_name', 'photo', 'description', 'address', 'menu_description']
         col_strings, values = columns_values_creator(columns)
@@ -428,6 +431,7 @@ class Restaurant(Resource):
         avg_rating = "{:.2f}".format(avg)
         return jsonify({'AverageRating': avg_rating, 'Rows': rows})
 
+    @admin_required()
     def put(self, restaurant_id):
         columns = ['name', 'legal_name', 'photo', 'description', 'address', 'menu_description']
         col_strings, values = columns_values_creator(columns)
@@ -436,13 +440,58 @@ class Restaurant(Resource):
         cur.execute(query)
         return {'Status': 200}
 
+    @admin_required()
     def delete(self, restaurant_id):
         query = query_creator('delete', 'restaurants', id=restaurant_id)
         cur = get_db_connection()
         cur.execute(query)
         return {'Status': 200}
 
+class RestaurantsMenu(Resource):
+    @restaurant_required()
+    def get(self):
+        id = get_jwt_identity()
+        query = query_creator('select', 'restaurants')
+        cur = get_db_connection()
+        cur.execute(query)
+        rows = cur.fetchall()
+        for row in rows:
+            row['menu_description'] = row['menu_description'].split(',')
+        return jsonify(rows)
+    def post(self): # add menu element
+        id = get_jwt_identity()
+        columns = ['name', 'description', 'price', 'photo']
+        col_strings, values = columns_values_creator(columns, extra_values=[id],
+                                                     extra_columns=['restaurant_id'])
+        query = query_creator('insert', 'menu_elements', col_strings, values)
+        cur = get_db_connection()
+        cur.execute(query)
+        return {'Status': 201}
 
+class RestaurantMenuElement(Resource):
+    @restaurant_required()
+    def get(self, menu_element_id):
+        query = query_creator('select_where', 'menu_elements', id=menu_element_id)
+        cur = get_db_connection()
+        cur.execute(query)
+        rows = cur.fetchone()
+        return jsonify(rows)
+
+    @restaurant_required()
+    def put(self, menu_element_id):
+        columns = ['name', 'description', 'price', 'photo']
+        col_strings, values = columns_values_creator(columns)
+        query = query_creator('update', 'menu_elements', col_strings, values, id=menu_element_id)
+        cur = get_db_connection()
+        cur.execute(query)
+        return {'Status': 200}
+
+    @restaurant_required()
+    def delete(self, menu_element_id):
+        query = query_creator('delete', 'menu_elements', id=menu_element_id)
+        cur = get_db_connection()
+        cur.execute(query)
+        return {'Status': 200}
 class RestaurantReviews(Resource):
     def get(self, restaurant_id):
         # fetch restaurant and its reviews by join method
@@ -472,6 +521,7 @@ class RestaurantReservations(Resource):
 
 
 class Waiters(Resource):
+    @admin_required()
     def get(self):
         query = query_creator('select', 'waiters')
         cur = get_db_connection()
@@ -489,6 +539,7 @@ class Waiters(Resource):
 
 
 class Waiter(Resource):
+    @admin_required()
     def get(self, waiter_id):
         query = query_creator('select_where', 'waiters', id=waiter_id)
         cur = get_db_connection()
@@ -496,6 +547,7 @@ class Waiter(Resource):
         rows = cur.fetchone()
         return jsonify(rows)
 
+    @admin_required()
     def put(self, waiter_id):
         columns = ['name', 'surname', 'restaurant_id']
         col_strings, values = columns_values_creator(columns)
@@ -504,6 +556,7 @@ class Waiter(Resource):
         cur.execute(query)
         return {'status': 200}
 
+    @admin_required()
     def delete(self, waiter_id):
         query = query_creator('delete', 'waiters', id=waiter_id)
         cur = get_db_connection()
@@ -600,6 +653,7 @@ class Reviews(Resource):
         rows = cur.fetchall()
         return jsonify(rows)
 
+    @admin_required()
     def post(self):
         columns = ['reservation_id', 'comment', 'rating']
         col_strings, values = columns_values_creator(columns)
@@ -617,6 +671,7 @@ class Review(Resource):
         rows = cur.fetchone()
         return jsonify(rows)
 
+    @admin_required()
     def put(self, review_id):
         columns = ['comment', 'rating']
         col_strings, values = columns_values_creator(columns)
@@ -625,6 +680,7 @@ class Review(Resource):
         cur.execute(query)
         return {'Status': 200}
 
+    @admin_required()
     def delete(self, review_id):
         query = query_creator('delete', 'reviews', id=review_id)
         cur = get_db_connection()
@@ -633,6 +689,7 @@ class Review(Resource):
 
 
 class Reservations(Resource):
+    @admin_required()
     def get(self):
         query = query_creator('select', 'reservations')
         cur = get_db_connection()
@@ -643,6 +700,7 @@ class Reservations(Resource):
             row['reservation_hour'] = row['reservation_hour'].strftime("%H:%M")
         return jsonify(rows)
 
+    @admin_required()
     def post(self):
         columns = ['waiter_id', 'user_id', 'restaurant_id', 'status', 'reservation_date', 'reservation_hour', 'persons',
                    'reservation_status']
@@ -661,6 +719,7 @@ class Reservations(Resource):
 
 
 class Reservation(Resource):
+    @admin_required()
     def get(self, reservation_id):
         query = query_creator('select_where', 'reservations', id=reservation_id)
         cur = get_db_connection()
@@ -670,6 +729,7 @@ class Reservation(Resource):
         rows['reservation_hour'] = rows['reservation_hour'].strftime("%H:%M")
         return jsonify(rows)
 
+    @admin_required()
     def put(self, reservation_id):
         columns = ['waiter_id', 'user_id', 'restaurant_id', 'status', 'reservation_date', 'reservation_hour', 'persons',
                    'reservation_status']
@@ -685,6 +745,7 @@ class Reservation(Resource):
         else:
             return {'Status': 400, 'message': 'Reservation is not available'}
 
+    @admin_required()
     def delete(self, reservation_id):
         query = query_creator('delete', 'reservations', id=reservation_id)
         cur = get_db_connection()
@@ -724,11 +785,16 @@ def if_reservation_available(self, reservation_date, reservation_hour, restauran
     return True
 
 
+# Test
+# Admin-register-user login
+
 api.add_resource(Test, '/test')
 
-#api.add_resource(Admins, '/admins')
 api.add_resource(AdminLogin, '/admins/login')
 api.add_resource(AdminRegister, '/admins/register')
+
+api.add_resource(RestaurantLogin, '/restaurants/login')
+api.add_resource(RestaurantRegister, '/restaurants/register')
 
 api.add_resource(Users, '/users')
 api.add_resource(UserLogin, '/users/login')
@@ -744,6 +810,7 @@ api.add_resource(MyReservation, '/my-reservations/<reservation_id>')  # user res
 
 api.add_resource(Restaurants, '/restaurants')
 api.add_resource(Restaurant, '/restaurants/<restaurant_id>')
+api.add_resource(RestaurantsMenu, '/restaurants/menu')
 api.add_resource(Menu,
                  '/restaurants/<restaurant_id>/menu')  # See the restaurant menu or Create menu if there is no menu
 api.add_resource(MenuElements, '/restaurants/<restaurant_id>/menu/menu-element')  # Update or Delete or Add menu element
